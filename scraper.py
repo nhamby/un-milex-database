@@ -260,6 +260,48 @@ class MilexScraper:
             if remarks_dd:
                 data["explanatory_remarks"] = remarks_dd.get_text(strip=True)
 
+        # Try alternative format for explanatory remarks (newer format)
+        if not data["explanatory_remarks"]:
+            # Look for h3, h4, or h5 with "Explanatory Remarks" or similar text
+            for tag in ["h3", "h4", "h5"]:
+                remarks_heading = soup.find(tag)
+                if remarks_heading:
+                    heading_text = remarks_heading.get_text(strip=True)
+                    if "explanatory" in heading_text.lower():
+                        # The remarks might be in the next paragraph or div
+                        next_elem = remarks_heading.find_next(["p", "div"])
+                        if next_elem:
+                            remarks_text = next_elem.get_text(strip=True)
+                            if remarks_text and len(remarks_text) > 10:
+                                # Remove redundant "Explanatory Remarks:" prefix if present
+                                if remarks_text.lower().startswith(
+                                    "explanatory remarks:"
+                                ):
+                                    remarks_text = remarks_text[20:].strip()
+                                data["explanatory_remarks"] = remarks_text
+                                break
+
+            # Also try looking for all divs/sections and check their class attribute
+            if not data["explanatory_remarks"]:
+                for elem in soup.find_all(["div", "section"]):
+                    elem_class = elem.get("class")
+                    if elem_class:
+                        class_str = (
+                            " ".join(elem_class)
+                            if isinstance(elem_class, list)
+                            else str(elem_class)
+                        )
+                        if "remark" in class_str.lower() or "note" in class_str.lower():
+                            remarks_text = elem.get_text(strip=True)
+                            if remarks_text and len(remarks_text) > 10:
+                                # Remove redundant prefix if present
+                                if remarks_text.lower().startswith(
+                                    "explanatory remarks:"
+                                ):
+                                    remarks_text = remarks_text[20:].strip()
+                                data["explanatory_remarks"] = remarks_text
+                                break
+
         # Extract Total Expenditure from metadata (not from table)
         # Look for h3 with "Total expenditure" label
         total_h3 = soup.find("h3", string=lambda x: x and "total expenditure" in x.lower())  # type: ignore
