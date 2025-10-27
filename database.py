@@ -54,6 +54,7 @@ class MilexDatabase:
                 total_expenditure_all REAL,
                 explanatory_remarks TEXT,
                 nil_report_expenditure TEXT,
+                single_figure_report_expenditure TEXT,
                 page_link TEXT,
                 scrape_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 {field_columns_sql},
@@ -62,6 +63,19 @@ class MilexDatabase:
         """
 
         self.cursor.execute(create_table_sql)
+
+        # Add single_figure_report_expenditure column if it doesn't exist (migration)
+        try:
+            self.cursor.execute(
+                """
+                ALTER TABLE expenditures 
+                ADD COLUMN single_figure_report_expenditure TEXT
+                """
+            )
+            self.conn.commit()
+        except sqlite3.OperationalError:
+            # Column already exists, ignore
+            pass
 
         # Metadata table for tracking scraping progress
         self.cursor.execute(
@@ -99,6 +113,7 @@ class MilexDatabase:
             "total_expenditure_all",
             "explanatory_remarks",
             "nil_report_expenditure",
+            "single_figure_report_expenditure",
             "page_link",
         ]
 
@@ -110,6 +125,7 @@ class MilexDatabase:
             data.get("total_expenditure_all"),
             data.get("explanatory_remarks"),
             data.get("nil_report_expenditure"),
+            data.get("single_figure_report_expenditure"),
             data.get("page_link"),
         ]
 

@@ -151,6 +151,15 @@ class MilexOrchestrator:
                             self.db.update_scraping_status(
                                 country, year, "failed", data["error"]
                             )
+                        elif data.get("single_figure_report_expenditure"):
+                            # Single figure report - has total but no detailed categories
+                            self.db.insert_or_update_expenditure(data)
+                            print(f"Single figure report ({page_duration:.1f}s)")
+                            self.db.update_scraping_status(country, year, "success")
+
+                            country_pages_scraped += 1
+                            total_pages_scraped += 1
+                            total_page_time += page_duration
                         elif (
                             not data.get("categories")
                             and data.get("total_expenditure_all") is None

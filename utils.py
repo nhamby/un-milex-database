@@ -98,6 +98,7 @@ def view_record(country: str, year: int):
         print(f"Total Expenditure: {data.get('total_expenditure_all')}")
         print(f"Explanatory Remarks: {data.get('explanatory_remarks')}")
         print(f"Nil Report: {data.get('nil_report_expenditure')}")
+        print(f"Single Figure Report: {data.get('single_figure_report_expenditure')}")
         print(f"Page Link: {data.get('page_link')}")
 
         categories = data.get("categories", {})

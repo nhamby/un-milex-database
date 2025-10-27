@@ -100,20 +100,112 @@ class MilexScraper:
             "total_expenditure_all": None,
             "explanatory_remarks": None,
             "nil_report_expenditure": None,
+            "single_figure_report_expenditure": None,
             "field_data": {},
         }
 
-        # Quick check for nil report - if found early, we can skip expensive parsing
-        nil_report_div = soup.find("div", class_=lambda x: x and "report" in x and "loaded" in x)  # type: ignore
+        # Check for nil report or single figure report early
+        # Find div with classes containing both "report" and "loaded"
+        nil_report_div = None
+        all_divs = soup.find_all("div")
+        for div in all_divs:
+            div_class = div.get("class")
+            if div_class:
+                if isinstance(div_class, list):
+                    class_str = " ".join(div_class)
+                else:
+                    class_str = str(div_class)
+                if "report" in class_str and "loaded" in class_str:
+                    nil_report_div = div
+                    break
+
         if nil_report_div:
             nil_report_p = nil_report_div.find("p")
             if nil_report_p:
-                nil_text = nil_report_p.get_text(strip=True)
-                # If it's a nil report, save it and skip the table parsing
-                if nil_text and len(nil_text) > 20:
-                    data["nil_report_expenditure"] = nil_text
-                    # For nil reports, no need to parse tables - just return
-                    return data
+                report_text = nil_report_p.get_text(strip=True)
+                # Check if it's meaningful content
+                if report_text and len(report_text) > 20:
+                    report_lower = report_text.lower()
+
+                    # Check for nil report indicators first (negative statements)
+                    nil_indicators = [
+                        "no military expenditure",
+                        "had no military expenditure",
+                        "neither armed nor military",
+                        "no armed forces",
+                        "does not have armed forces",
+                        "possesses neither armed",
+                        "nil report",
+                        "no data to report",
+                        "unable to provide",
+                        "not in a position to",
+                    ]
+
+                    is_nil_report = any(
+                        indicator in report_lower for indicator in nil_indicators
+                    )
+
+                    if is_nil_report:
+                        # This is a nil report (no data provided)
+                        data["nil_report_expenditure"] = report_text
+                        # For nil reports, no need to parse further - just return
+                        return data
+
+                    # Check if it's a single figure report (positive statement with amounts)
+                    # Look for patterns like "expenditures... were XXX" with actual numbers
+                    single_figure_indicators = [
+                        "single figure" in report_lower,
+                        "total military expenditure" in report_lower
+                        and "were" in report_lower,
+                        (
+                            "military expenditure" in report_lower
+                            and "were" in report_lower
+                            and any(char.isdigit() for char in report_text)
+                        ),
+                    ]
+
+                    if any(single_figure_indicators):
+                        # This is a single figure report
+                        data["single_figure_report_expenditure"] = report_text
+                        # Continue parsing to extract metadata and totals
+                    else:
+                        # Default to nil report for other cases
+                        data["nil_report_expenditure"] = report_text
+                        return data
+
+        # Also check all paragraphs for single figure report (alternative location)
+        if not data["single_figure_report_expenditure"]:
+            all_paragraphs = soup.find_all("p")
+            for p in all_paragraphs:
+                p_text = p.get_text(strip=True)
+                if p_text and len(p_text) > 50:
+                    p_lower = p_text.lower()
+
+                    # Skip if it's a nil report
+                    nil_indicators = [
+                        "no military expenditure",
+                        "had no military expenditure",
+                        "neither armed nor military",
+                        "no armed forces",
+                    ]
+                    if any(indicator in p_lower for indicator in nil_indicators):
+                        continue
+
+                    # Check for single figure indicators
+                    if (
+                        "single figure" in p_lower
+                        or (
+                            "total military expenditure" in p_lower
+                            and "were" in p_lower
+                        )
+                        or (
+                            "military expenditure" in p_lower
+                            and "were" in p_lower
+                            and any(char.isdigit() for char in p_text)
+                        )
+                    ):
+                        data["single_figure_report_expenditure"] = p_text
+                        break
 
         # Extract National Currency
         # Try dt/dd structure first (older format)
