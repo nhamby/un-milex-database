@@ -33,27 +33,30 @@ class MilexScraper:
         """
         url = config.get_country_year_url(country_code, year)
 
+        # Optimized browser settings
+        chrome_options = [
+            "--disable-blink-features=AutomationControlled",
+            "--disable-gpu",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
+        ]
+
         with SB(
-            uc=True,
+            uc=False,  # Disable undetected mode for speed (try without first)
             headless=self.headless,
-            chromium_arg="--disable-blink-features=AutomationControlled",
+            chromium_arg=",".join(chrome_options),
+            page_load_strategy="eager",  # Don't wait for all resources
         ) as sb:
             try:
                 # Navigate to the page
                 sb.open(url)
 
-                # Wait for the report div to load (either with data or nil report)
-                # The div.spinner-container should be replaced by div.report.loaded
+                # Wait for report div to load (returns immediately when found)
                 try:
-                    # Wait up to 10 seconds for either the report div or an error indicator
-                    sb.wait_for_element_present("div.report.loaded", timeout=10)
+                    sb.wait_for_element_visible("div.report.loaded", timeout=3)
                 except Exception:
-                    # If div.report.loaded doesn't appear, continue anyway
-                    # The page might use a different structure
+                    # If it doesn't load in 3 seconds, proceed anyway
                     pass
-
-                # Additional wait to ensure all content is loaded
-                time.sleep(1)
 
                 # Get page source
                 page_source = sb.get_page_source()
@@ -99,6 +102,18 @@ class MilexScraper:
             "nil_report_expenditure": None,
             "field_data": {},
         }
+
+        # Quick check for nil report - if found early, we can skip expensive parsing
+        nil_report_div = soup.find("div", class_=lambda x: x and "report" in x and "loaded" in x)  # type: ignore
+        if nil_report_div:
+            nil_report_p = nil_report_div.find("p")
+            if nil_report_p:
+                nil_text = nil_report_p.get_text(strip=True)
+                # If it's a nil report, save it and skip the table parsing
+                if nil_text and len(nil_text) > 20:
+                    data["nil_report_expenditure"] = nil_text
+                    # For nil reports, no need to parse tables - just return
+                    return data
 
         # Extract National Currency
         # Try dt/dd structure first (older format)
@@ -152,19 +167,6 @@ class MilexScraper:
             remarks_dd = remarks_elem.find_next_sibling("dd")
             if remarks_dd:
                 data["explanatory_remarks"] = remarks_dd.get_text(strip=True)
-
-        # Extract Nil Report Expenditure text
-        # Look for <p> tag within div.report.loaded
-        nil_report_div = soup.find("div", class_=lambda x: x and "report" in x and "loaded" in x)  # type: ignore
-        if nil_report_div:
-            nil_report_p = nil_report_div.find("p")
-            if nil_report_p:
-                nil_text = nil_report_p.get_text(strip=True)
-                # Only save if it contains meaningful content (not empty or generic)
-                if (
-                    nil_text and len(nil_text) > 20
-                ):  # Arbitrary threshold to avoid noise
-                    data["nil_report_expenditure"] = nil_text
 
         # Extract Total Expenditure from metadata (not from table)
         # Look for h3 with "Total expenditure" label

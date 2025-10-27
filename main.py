@@ -155,10 +155,18 @@ class MilexOrchestrator:
                             not data.get("categories")
                             and data.get("total_expenditure_all") is None
                         ):
-                            print(f"No data available ({page_duration:.1f}s)")
+                            # Check if this is a nil report (explicit message about no data)
+                            if data.get("nil_report_expenditure"):
+                                print(f"Nil report ({page_duration:.1f}s)")
+                            else:
+                                print(f"No data available ({page_duration:.1f}s)")
                             self.db.update_scraping_status(country, year, "no_data")
                             # Still save the record with NAs
                             self.db.insert_or_update_expenditure(data)
+
+                            country_pages_scraped += 1
+                            total_pages_scraped += 1
+                            total_page_time += page_duration
                         else:
                             # Save to database
                             self.db.insert_or_update_expenditure(data)
@@ -187,8 +195,17 @@ class MilexOrchestrator:
                         self.db.update_scraping_status(country, year, "failed", str(e))
 
                     # Delay between requests to be respectful
+                    # Use shorter delay for nil reports (no data pages)
                     if not self.interrupted:
-                        time.sleep(self.delay)
+                        if data.get("nil_report_expenditure") or (
+                            not data.get("categories")
+                            and data.get("total_expenditure_all") is None
+                        ):
+                            # Shorter delay for no-data pages (0.3 seconds)
+                            time.sleep(0.3)
+                        else:
+                            # Normal delay for data pages
+                            time.sleep(self.delay)
 
                 # Print country summary
                 if country_pages_scraped > 0:
