@@ -30,7 +30,7 @@ wheels/
 
 # Downloaded files
 downloads/
-*.csv
+# *.csv
 *.pdf
 !requirements.txt
 
