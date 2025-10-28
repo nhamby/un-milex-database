@@ -13,16 +13,31 @@ BASE_URL = "https://milex-reporting.unoda.org/en/states"
 START_YEAR = 1998
 END_YEAR = 2024
 
+# Country codes list selection
+# Set to True to use the short list (fewer countries)
+# Set to False to use the long list (all countries)
+USE_SHORT_COUNTRY_LIST = True
+
 
 # Load ISO 3166-1 alpha-3 country codes from external file
-def _load_country_codes() -> List[str]:
-    """Load country codes from country_codes.json file.
+def _load_country_codes(use_short: bool = USE_SHORT_COUNTRY_LIST) -> List[str]:
+    """Load country codes from country_codes file.
+
+    Args:
+        use_short: If True, load from country_codes_short.json,
+                   otherwise load from country_codes_long.json
 
     Returns:
         List of ISO 3166-1 alpha-3 country codes
     """
     config_dir = os.path.dirname(os.path.abspath(__file__))
-    country_codes_path = os.path.join(config_dir, "country_codes.json")
+
+    if use_short:
+        country_codes_path = os.path.join(config_dir, "country_codes_short.json")
+        file_name = "country_codes_short.json"
+    else:
+        country_codes_path = os.path.join(config_dir, "country_codes_long.json")
+        file_name = "country_codes_long.json"
 
     try:
         with open(country_codes_path, "r", encoding="utf-8") as f:
@@ -30,10 +45,10 @@ def _load_country_codes() -> List[str]:
     except FileNotFoundError:
         raise FileNotFoundError(
             f"Country codes file not found at {country_codes_path}. "
-            "Please ensure country_codes.json exists in the project directory."
+            f"Please ensure {file_name} exists in the project directory."
         )
     except json.JSONDecodeError as e:
-        raise ValueError(f"Invalid JSON in country_codes.json: {e}")
+        raise ValueError(f"Invalid JSON in {file_name}: {e}")
 
 
 COUNTRY_CODES = _load_country_codes()

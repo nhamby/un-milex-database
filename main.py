@@ -495,6 +495,11 @@ Examples:
     parser.add_argument(
         "--no-resume", action="store_true", help="Re-scrape already scraped data"
     )
+    parser.add_argument(
+        "--use-long-list",
+        action="store_true",
+        help="Use the long country codes list instead of the short list",
+    )
 
     # Export options
     parser.add_argument(
@@ -511,6 +516,14 @@ Examples:
     )
 
     args = parser.parse_args()
+
+    # Handle country list selection
+    if args.use_long_list:
+        # Reload config with long list
+        import importlib
+
+        config.USE_SHORT_COUNTRY_LIST = False
+        config.COUNTRY_CODES = config._load_country_codes(use_short=False)
 
     # Handle different modes
     if args.example:

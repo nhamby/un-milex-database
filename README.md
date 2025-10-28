@@ -11,7 +11,7 @@ This tool scrapes military expenditure data from <https://milex-reporting.unoda.
 - **385 Standardized Fields**: Captures complete UN MILEX structure with consistent field names
 - **11 Force Categories**: Strategic, Land, Naval, Air, Other Military, Central Support, UN Peacekeeping, Military Assistance, Emergency Aid, Undistributed, Total Expenditure
 - **35 Expenditure Subcategories**: Personnel, Operations, Procurement, Construction, R&D with detailed breakdowns
-- **193+ Countries**: All UN member states from 1998-2024 (configurable)
+- **Flexible Country Coverage**: Choose between 110 countries (default, faster) or 193 countries (complete)
 - **Wide Table Schema**: One row per country-year with 395 columns (10 metadata + 385 data fields)
 - **Progress Tracking**: Resume capability, error logging, performance timing
 - **Graceful Interrupts**: Ctrl+C handling with progress preservation
@@ -52,6 +52,9 @@ All functionality is accessed through `main.py`. Run `python main.py --help` for
 ```bash
 # Scrape all countries and years (1998-2024, takes several hours)
 python main.py
+
+# Use long country list (193 countries instead of default 110)
+python main.py --use-long-list
 
 # Scrape specific countries
 python main.py --country USA,GBR,FRA,CHN,RUS
@@ -264,7 +267,7 @@ python main.py --example
 # Scrape P5 countries for last decade
 python main.py --country USA,GBR,FRA,RUS,CHN --start-year 2014
 
-# Scrape all NATO countries, recent years only
+# Scrape NATO countries, recent years only
 python main.py --country USA,GBR,FRA,DEU,ITA,ESP,CAN,POL --start-year 2020
 
 # Check progress
@@ -278,16 +281,17 @@ python main.py --view USA 2024
 ## Project Structure
 
 ```text
-main.py                 # CLI interface for all operations
-scraper.py              # SeleniumBase web scraper with 11×35 table parsing
-parser.py               # HTML table parser (legacy support)
-database.py             # SQLite database manager with wide schema
-export.py               # CSV export functions
-utils.py                # Statistics, view, and list utilities
-config.py               # Configuration and field name generation
-milex_fields.json       # 385-field structure definition
-country_codes.json      # 193 ISO 3166-1 alpha-3 country codes
-requirements.txt        # Python dependencies
+main.py                      # CLI interface for all operations
+scraper.py                   # SeleniumBase web scraper with 11×35 table parsing
+parser.py                    # HTML table parser (legacy support)
+database.py                  # SQLite database manager with wide schema
+export.py                    # CSV export functions
+utils.py                     # Statistics, view, and list utilities
+config.py                    # Configuration and field name generation
+milex_fields.json            # 385-field structure definition
+country_codes_short.json     # 110 ISO 3166-1 alpha-3 country codes (default)
+country_codes_long.json      # 193 ISO 3166-1 alpha-3 country codes (all UN members)
+requirements.txt             # Python dependencies
 ```
 
 ## Configuration
@@ -301,8 +305,37 @@ START_YEAR = 1998              # Starting year for scraping
 END_YEAR = 2024                # Ending year for scraping
 BASE_URL = "https://milex-reporting.unoda.org/en/states"
 
+# Country list selection
+USE_SHORT_COUNTRY_LIST = True  # Use short list (110 countries) by default
+                               # Set to False for long list (193 countries)
+
 # 385 standardized field names generated from milex_fields.json
 ALL_FIELD_NAMES = get_all_field_names()  # 11 categories × 35 subcategories
+```
+
+### Country Lists
+
+The scraper supports two country code lists:
+
+- **Short List** (`country_codes_short.json`): 110 countries - the default
+
+  - Optimized for faster scraping sessions
+  - Includes major economies, UN Security Council members, NATO, and significant regional powers
+  - Estimated scrape time: ~2-3 hours for full year range
+
+- **Long List** (`country_codes_long.json`): 193 countries - all UN member states
+  - Comprehensive coverage of all countries
+  - Use `--use-long-list` flag or change `USE_SHORT_COUNTRY_LIST = False` in config.py
+  - Estimated scrape time: ~4-6 hours for full year range
+
+**Switching Between Lists:**
+
+```bash
+# Command-line (temporary)
+python main.py --use-long-list
+
+# Permanent change (edit config.py)
+USE_SHORT_COUNTRY_LIST = False  # Use long list by default
 ```
 
 ### milex_fields.json
@@ -320,8 +353,10 @@ Defines the 11 force categories and 35 expenditure subcategories that generate t
 
 ### Performance
 
-- **Scraping Speed**: ~1-2 seconds per page (with default 1s delay)
-- **Total Time**: 2-4 hours for complete scrape (193 countries × 27 years)
+- **Scraping Speed**: ~7-10 seconds per page with optimizations
+- **Total Time**:
+  - Short list (110 countries): ~2-3 hours for complete scrape (110 × 27 years)
+  - Long list (193 countries): ~4-6 hours for complete scrape (193 × 27 years)
 - **Database Size**: ~50-100 MB (estimated for full dataset)
 - **Resume Capability**: Automatic skip of existing records
 - **Column Count**: 395 (well under SQLite's 2000-column limit)
